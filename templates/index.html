@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Генератор постов</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="container">
+
+    <!-- Заголовок страницы -->
+    <header class="page-header">
+        <h1>Генератор постов для товара</h1>
+        <p>Вставьте ссылку на товар — нейросеть напишет оригинальный пост</p>
+    </header>
+
+    <!-- ФОРМА: данные отправляются на тот же адрес страницы -->
+    <section class="card">
+        <form method="POST" action="/" id="post-form">
+
+            <!-- Ссылка на товар (обязательное поле, звёздочка) -->
+            <label for="link">
+                Ссылка на товар <span class="required">*</span>
+            </label>
+            <input type="url" id="link" name="link" required
+                   value="{{ link }}"
+                   placeholder="https://магазин.ру/товар/термокружка">
+
+            <!-- Выбор настроения поста -->
+            <label for="mood">Настроение поста</label>
+            <select id="mood" name="mood">
+                {% for mood in mood_options %}
+                <option value="{{ mood.key }}">{{ mood.label }}</option>
+                {% endfor %}
+            </select>
+
+            <!-- Кнопка отправки формы -->
+            <button type="submit" class="btn-primary" id="submit-btn">Сформировать пост</button>
+        </form>
+
+        <!-- Сообщение об ошибке (нет ссылки, проблемы с API и т.п.) -->
+        {% if error %}
+        <p class="error-message">{{ error }}</p>
+        {% endif %}
+    </section>
+
+    <!-- БЛОК С ГОТОВЫМ ПОСТОМ -->
+    <section class="card result-card">
+        <h2>Готовый пост</h2>
+
+        {% if post %}
+            <!-- Текст поста. id="post-text" нужен, чтобы кнопка копирования его находила -->
+            <pre id="post-text" class="post-output">{{ post }}</pre>
+
+            <button type="button" id="copy-btn" class="btn-secondary">Скопировать пост</button>
+
+            <!-- Скрытое сообщение "Пост скопирован", появится после нажатия -->
+            <span id="copy-message" class="copy-message" hidden>Пост скопирован</span>
+        {% else %}
+            <p class="post-placeholder">Здесь появится ваш пост…</p>
+        {% endif %}
+    </section>
+
+</div>
+
+<script>
+    // Пока нейросеть пишет пост — показываем сообщение на кнопке
+    const form = document.getElementById('post-form');
+    const submitBtn = document.getElementById('submit-btn');
+
+    form.addEventListener('submit', function () {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Нейросеть пишет пост… это займёт до минуты';
+    });
+
+    // Кнопка "Скопировать пост": копирует текст и показывает подтверждение
+    const copyBtn = document.getElementById('copy-btn');
+
+    if (copyBtn) {
+        copyBtn.addEventListener('click', function () {
+            const text = document.getElementById('post-text').innerText;
+
+            navigator.clipboard.writeText(text).then(function () {
+                const message = document.getElementById('copy-message');
+                message.hidden = false;          // показываем "Пост скопирован"
+                setTimeout(function () {
+                    message.hidden = true;       // прячем через 2 секунды
+                }, 2000);
+            });
+        });
+    }
+</script>
+
+</body>
+</html>

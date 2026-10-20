@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Виртуальное окружение
+venv/
+.venv/
+env/
+
+# Файлы IDE и редакторов
+.vscode/
+.idea/
+
+# Окружение и секреты
+.env
+.env.*
+
+# ОС
+.DS_Store
+Thumbs.db
+desktop.ini

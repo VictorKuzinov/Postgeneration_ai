@@ -1,0 +1,176 @@
+/* =================================================================
+   Стили страницы генератора постов.
+   Здесь можно менять цвета, скругления, отступы.
+   ================================================================= */
+
+/* Общие настройки страницы */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    color: #24292f;
+    /* Приятный градиентный фон */
+    background: linear-gradient(135deg, #e0e7ff 0%, #f5f3ff 50%, #fdf2f8 100%);
+    min-height: 100vh;
+    padding: 40px 16px;
+}
+
+.container {
+    max-width: 720px;
+    margin: 0 auto;
+}
+
+/* Заголовок страницы */
+.page-header {
+    text-align: center;
+    margin-bottom: 32px;
+}
+
+.page-header h1 {
+    font-size: 32px;
+    margin-bottom: 8px;
+}
+
+.page-header p {
+    color: #6b7280;
+}
+
+/* Карточка — блок с формой или результатом */
+.card {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 24px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+/* Надписи над полями */
+label {
+    display: block;
+    font-weight: 600;
+    margin: 18px 0 6px;
+}
+
+label:first-child {
+    margin-top: 0;
+}
+
+/* Красная звёздочка у обязательного поля */
+.required {
+    color: #e11d48;
+}
+
+/* Поля ввода, текстовая область и выпадающий список */
+input,
+textarea,
+select {
+    width: 100%;
+    padding: 12px 14px;
+    border: 2px solid #e5e7eb;
+    border-radius: 10px;
+    font-size: 16px;
+    font-family: inherit;
+    background: #f9fafb;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+    outline: none;
+    border-color: #6366f1;
+    background: #ffffff;
+}
+
+textarea {
+    resize: vertical;
+}
+
+/* Основная кнопка */
+.btn-primary {
+    width: 100%;
+    margin-top: 24px;
+    padding: 14px;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #ffffff;
+    font-size: 17px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+}
+
+/* Кнопка копирования */
+.btn-secondary {
+    margin-top: 16px;
+    padding: 12px 22px;
+    border: 2px solid #6366f1;
+    border-radius: 10px;
+    background: #ffffff;
+    color: #6366f1;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+
+.btn-secondary:hover {
+    background: #6366f1;
+    color: #ffffff;
+}
+
+/* Сообщение "Пост скопирован" */
+.copy-message {
+    margin-left: 12px;
+    color: #16a34a;
+    font-weight: 600;
+}
+
+/* Блок с результатом */
+.result-card h2 {
+    margin-bottom: 16px;
+}
+
+/* Готовый пост: моноширинный шрифт, как в мессенджере */
+.post-output {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    background: #f3f4f6;
+    border-left: 4px solid #6366f1;
+    border-radius: 10px;
+    padding: 18px;
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+/* Заглушка, если пост ещё не сформирован */
+.post-placeholder {
+    color: #9ca3af;
+    text-align: center;
+    padding: 32px;
+    background: #f9fafb;
+    border: 2px dashed #e5e7eb;
+    border-radius: 10px;
+}
+
+/* Сообщение об ошибке (красное) */
+.error-message {
+    margin-top: 16px;
+    padding: 12px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 10px;
+    color: #dc2626;
+    font-weight: 600;
+}
