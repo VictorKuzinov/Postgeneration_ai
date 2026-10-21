@@ -13,12 +13,21 @@
     <!-- Заголовок страницы -->
     <header class="page-header">
         <h1>Генератор постов для товара</h1>
-        <p>Вставьте ссылку на товар — нейросеть напишет оригинальный пост</p>
+        <p>Вставьте ссылку на товар — нейросеть напишет пост, потом сохраните или опубликуйте его в ВКонтакте</p>
     </header>
 
-    <!-- ФОРМА: данные отправляются на тот же адрес страницы -->
+    <!-- Сообщения об успехе и ошибках (общие для всех действий) -->
+    {% if message %}
+    <p class="success-message">{{ message }}</p>
+    {% endif %}
+    {% if error %}
+    <p class="error-message">{{ error }}</p>
+    {% endif %}
+
+    <!-- ФОРМА ГЕНЕРАЦИИ: данные отправляются на тот же адрес страницы -->
     <section class="card">
         <form method="POST" action="/" id="post-form">
+            <input type="hidden" name="action" value="generate">
 
             <!-- Ссылка на товар (обязательное поле, звёздочка) -->
             <label for="link">
@@ -39,27 +48,95 @@
             <!-- Кнопка отправки формы -->
             <button type="submit" class="btn-primary" id="submit-btn">Сформировать пост</button>
         </form>
-
-        <!-- Сообщение об ошибке (нет ссылки, проблемы с API и т.п.) -->
-        {% if error %}
-        <p class="error-message">{{ error }}</p>
-        {% endif %}
     </section>
 
     <!-- БЛОК С ГОТОВЫМ ПОСТОМ -->
+    {% if show_actions %}
     <section class="card result-card">
         <h2>Готовый пост</h2>
 
-        {% if post %}
-            <!-- Текст поста. id="post-text" нужен, чтобы кнопка копирования его находила -->
-            <pre id="post-text" class="post-output">{{ post }}</pre>
+        <!-- Текст поста. id="post-text" нужен, чтобы кнопка копирования его находила -->
+        <pre id="post-text" class="post-output">{{ post }}</pre>
 
-            <button type="button" id="copy-btn" class="btn-secondary">Скопировать пост</button>
+        <!-- Форма редактирования поста (появляется по кнопке «Изменить») -->
+        <form method="POST" action="/" class="actions-form" id="edit-form" hidden>
+            <label for="edit-textarea">Редактирование поста</label>
+            <textarea name="post_text" id="edit-textarea" rows="10">{{ post }}</textarea>
+            <input type="hidden" name="link" value="{{ link }}">
 
-            <!-- Скрытое сообщение "Пост скопирован", появится после нажатия -->
-            <span id="copy-message" class="copy-message" hidden>Пост скопирован</span>
+            <div class="buttons-row">
+                <button type="submit" name="action" value="edit" class="btn-secondary">
+                    Сохранить изменения
+                </button>
+                <button type="button" id="cancel-edit" class="btn-secondary">Отмена</button>
+            </div>
+        </form>
+
+        <!-- Все действия с постом: одна форма, кнопки отличаются именем action -->
+        <form method="POST" action="/" class="actions-form" id="actions-form">
+            <input type="hidden" name="post_text" value="{{ post }}">
+            <input type="hidden" name="link" value="{{ link }}">
+
+            <div class="buttons-row">
+                <button type="button" id="copy-btn" class="btn-secondary">Скопировать пост</button>
+                <span id="copy-message" class="copy-message" hidden>Пост скопирован</span>
+
+                <button type="button" id="edit-btn" class="btn-secondary">Изменить</button>
+
+                <button type="submit" name="action" value="favorite" class="btn-secondary">
+                    В избранное
+                </button>
+
+                <button type="submit" name="action" value="publish" class="btn-secondary">
+                    Опубликовать пост
+                </button>
+            </div>
+
+            <!-- Отложенная публикация: выбираем дату и время -->
+            <div class="schedule-row">
+                <label for="publish_at">Отложить пост на:</label>
+                <input type="datetime-local" id="publish_at" name="publish_at">
+                <button type="submit" name="action" value="schedule" class="btn-secondary">
+                    Отложить
+                </button>
+            </div>
+        </form>
+    </section>
+    {% endif %}
+
+    <!-- ИЗБРАННЫЕ ПОСТЫ -->
+    <section class="card">
+        <h2>Избранное</h2>
+
+        {% if favorites %}
+            {% for fav in favorites %}
+            <div class="favorite-item">
+                <pre class="favorite-text">{{ fav.text }}</pre>
+                <p class="favorite-meta">Сохранён {{ fav.created }}</p>
+
+                <!-- Действия с избранным постом -->
+                <form method="POST" action="/" class="actions-form">
+                    <input type="hidden" name="post_text" value="{{ fav.text }}">
+                    <input type="hidden" name="link" value="{{ fav.link }}">
+                    <input type="hidden" name="fav_id" value="{{ fav.id }}">
+
+                    <div class="buttons-row">
+                        <button type="submit" name="action" value="use" class="btn-secondary">
+                            Вставить в редактор
+                        </button>
+                        <button type="button" class="btn-secondary copy-fav">Копировать</button>
+                        <button type="submit" name="action" value="publish" class="btn-secondary">
+                            Опубликовать
+                        </button>
+                        <button type="submit" name="action" value="delete_fav" class="btn-danger">
+                            Удалить
+                        </button>
+                    </div>
+                </form>
+            </div>
+            {% endfor %}
         {% else %}
-            <p class="post-placeholder">Здесь появится ваш пост…</p>
+            <p class="post-placeholder">Пока ничего не сохранено. Сформируйте пост и нажмите «В избранное».</p>
         {% endif %}
     </section>
 
@@ -89,6 +166,41 @@
                     message.hidden = true;       // прячем через 2 секунды
                 }, 2000);
             });
+        });
+    }
+
+    // Кнопки "Копировать" у избранных постов
+    document.querySelectorAll('.copy-fav').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const text = btn.closest('.favorite-item')
+                            .querySelector('.favorite-text').innerText;
+            navigator.clipboard.writeText(text).then(function () {
+                const old = btn.textContent;
+                btn.textContent = 'Скопировано';
+                setTimeout(function () { btn.textContent = old; }, 2000);
+            });
+        });
+    });
+
+    // Кнопка "Изменить": прячет обычный вид поста и открывает редактор
+    const editBtn = document.getElementById('edit-btn');
+
+    if (editBtn) {
+        const actionsForm = document.getElementById('actions-form');
+        const editForm = document.getElementById('edit-form');
+        const postBlock = document.getElementById('post-text');
+
+        editBtn.addEventListener('click', function () {
+            postBlock.hidden = true;
+            actionsForm.hidden = true;
+            editForm.hidden = false;
+        });
+
+        // Кнопка "Отмена" — возвращает всё как было
+        document.getElementById('cancel-edit').addEventListener('click', function () {
+            editForm.hidden = true;
+            postBlock.hidden = false;
+            actionsForm.hidden = false;
         });
     }
 </script>

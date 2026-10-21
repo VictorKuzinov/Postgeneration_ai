@@ -1,31 +1,39 @@
 # -*- coding: utf-8 -*-
 """
-Генератор постов для товара: Flask + нейросеть через OpenRouter.
+Генератор постов для товара: Flask + нейросеть + ВКонтакте.
 
 Как запустить:
     1. pip install -r requirements.txt
-    2. В файле .env должен быть ключ:  API_KEY=sk-or-ваш_ключ
+    2. В файле .env заполните ключи (см. VK_SETUP.md — как их получить):
+         API_KEY=sk-or-...        — ключ OpenRouter (нейросеть)
+         VK_TOKEN=...             — токен сообщества ВКонтакте
+         VK_GROUP_ID=123456       — числовой ID сообщества
     3. python app.py
     4. Открыть в браузере http://127.0.0.1:5000
 
-Как работает:
-    пользователь вставляет ссылку на товар -> сайт отправляет её
-    нейросети OpenRouter (модель сама открывает страницу и изучает товар)
-    -> модель пишет оригинальный пост -> пост появляется на странице.
+Что умеет:
+    - генерирует пост по ссылке на товар с помощью нейросети
+    - копирует пост, сохраняет в избранное (файл favorites.json)
+    - публикует пост в сообществе ВКонтакте сразу или отложенно
+      (отложенные посты создаются самим ВК — раздел «Отложенные записи»)
 
 Полезные ссылки:
-    Каталог моделей и цен: https://openrouter.ai/models
-    Документация:          https://openrouter.ai/docs
+    Модели OpenRouter:  https://openrouter.ai/models
+    API ВКонтакте:      https://dev.vk.com/ru/reference
+    Подключение ВК:     VK_SETUP.md (инструкция рядом с этим файлом)
 """
 
+import json
 import os
 import re
+from datetime import datetime
+from pathlib import Path
 
 import requests
 from dotenv import load_dotenv
 from flask import Flask, render_template, request
 
-# Читает переменные из файла .env (API_KEY, MODEL)
+# Читает переменные из файла .env (API_KEY, MODEL, VK_TOKEN, VK_GROUP_ID)
 load_dotenv()
 
 app = Flask(__name__)
@@ -33,8 +41,7 @@ app = Flask(__name__)
 # =====================================================================
 # НАСТРОЙКИ НЕЙРОСЕТИ (OpenRouter)
 # =====================================================================
-# OpenRouter — это единый доступ ко множеству моделей (OpenAI, Anthropic,
-# Google и другие) по одному ключу и одному адресу, в формате OpenAI API.
+# OpenRouter — единый доступ ко множеству моделей в формате OpenAI API.
 
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -45,7 +52,6 @@ API_KEY = os.getenv("API_KEY", "")
 # По умолчанию — бесплатная модель (суффикс :free).
 # Другую модель можно задать в .env строкой:  MODEL=openai/gpt-4o-mini
 # Платные модели: https://openrouter.ai/models
-# Бесплатные списывает только время ожидания — лимиты строже.
 MODEL = os.getenv("MODEL", "minimax/minimax-m3.1-flash:free")
 
 # Сколько секунд ждать ответ (поиск в интернете может быть долгим)
@@ -58,6 +64,20 @@ TIMEOUT = 120
 # на бесплатных моделях может не работать.
 # False — модель пишет пост по ссылке без открытия страницы.
 USE_WEB_SEARCH = False
+
+# =====================================================================
+# НАСТРОЙКИ ВКОНТАКТЕ
+# =====================================================================
+# Токен и ID сообщества — тоже из файла .env.
+# Подробная инструкция по получению — в файле VK_SETUP.md.
+
+VK_API_URL = "https://api.vk.com/method/"
+VK_TOKEN = os.getenv("VK_TOKEN", "")
+VK_GROUP_ID = os.getenv("VK_GROUP_ID", "").strip().lstrip("-")
+VK_API_VERSION = "5.199"
+
+# Файл, где хранятся посты «В избранном» (просто JSON, база не нужна)
+FAVORITES_FILE = Path("favorites.json")
 
 
 # =====================================================================
@@ -137,7 +157,7 @@ def build_prompt(link, mood_key, settings):
    преимущества, цену — всё, что найдёшь на странице."""
     else:
         first_step = """1. Определи по ссылке, о каком товаре речь (название магазина,
-   категория товара в адресе), и напиши правдоподобный живой пост.""" 
+   категория товара в адресе), и напиши правдоподобный живой пост."""
 
     return f"""
 Напиши рекламный пост для социальных сетей о товаре по ссылке.
@@ -246,39 +266,194 @@ def ask_neural_network(prompt):
 
 
 # =====================================================================
+# ИЗБРАННОЕ (посты сохраняются в файл favorites.json)
+# =====================================================================
+def load_favorites():
+    """Читает список избранных постов из файла."""
+    try:
+        with open(FAVORITES_FILE, "r", encoding="utf-8") as file:
+            data = json.load(file)
+            return data if isinstance(data, list) else []
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []  # файла нет или он битый — считаем, что избранное пустое
+
+
+def save_favorites(favorites):
+    """Сохраняет список избранных постов в файл."""
+    with open(FAVORITES_FILE, "w", encoding="utf-8") as file:
+        json.dump(favorites, file, ensure_ascii=False, indent=2)
+
+
+def add_to_favorites(text, link):
+    """Добавляет пост в избранное. Возвращает (список, сообщение)."""
+    favorites = load_favorites()
+    favorites.insert(0, {
+        "id": datetime.now().strftime("%Y%m%d%H%M%S%f"),  # уникальный номер
+        "text": text,
+        "link": link,
+        "created": datetime.now().strftime("%d.%m.%Y %H:%M"),
+    })
+    save_favorites(favorites)
+    return favorites, "Пост сохранён в избранное"
+
+
+def delete_from_favorites(fav_id):
+    """Удаляет пост из избранного по его номеру."""
+    favorites = [f for f in load_favorites() if f.get("id") != fav_id]
+    save_favorites(favorites)
+    return favorites, "Пост удалён из избранного"
+
+
+# =====================================================================
+# ПУБЛИКАЦИЯ В ВКОНТАКТЕ
+# =====================================================================
+def publish_to_vk(text, publish_at=None):
+    """
+    Публикует пост в сообществе ВКонтакте.
+
+    Параметры:
+        text       — текст поста
+        publish_at — объект datetime для отложенной записи
+                     (None — опубликовать сразу)
+
+    ВКонтакте умеет сама хранить отложенные записи: если передать
+    publish_date, пост появится в разделе «Отложенные записи»
+    сообщества и будет опубликован автоматически в нужное время.
+    Наш сервер для этого работать не обязан — можно даже выключить.
+    """
+    if not VK_TOKEN or not VK_GROUP_ID:
+        return ("ВКонтакте не настроено. Заполните VK_TOKEN и VK_GROUP_ID "
+                "в файле .env — инструкция в VK_SETUP.md.")
+
+    params = {
+        # owner_id сообщества всегда со знаком минус
+        "owner_id": f"-{VK_GROUP_ID}",
+        "message": text,
+        "access_token": VK_TOKEN,
+        "v": VK_API_VERSION,
+    }
+
+    # Отложенная публикация: время в формате Unix (секунды)
+    if publish_at is not None:
+        params["publish_date"] = int(publish_at.timestamp())
+
+    try:
+        response = requests.get(
+            VK_API_URL + "wall.post",
+            params=params,
+            timeout=30,
+        )
+    except requests.exceptions.RequestException:
+        return "Не удалось связаться с ВКонтакте. Проверьте интернет."
+
+    data = response.json()
+
+    # ВК всегда отвечает {"error": {...}} при проблемах
+    if "error" in data:
+        return f"Ошибка ВКонтакте: {data['error'].get('error_msg', 'неизвестная ошибка')}"
+
+    post_id = data.get("response", {}).get("post_id")
+
+    if publish_at is not None:
+        return (f"Пост отложен! ВКонтакте опубликует его "
+                f"{publish_at.strftime('%d.%m.%Y в %H:%M')} "
+                f"(запись №{post_id} в разделе «Отложенные записи»).")
+    return f"Пост опубликован в сообществе (запись №{post_id})."
+
+
+def split_result(text):
+    """
+    Делит результат на (сообщение_об_успехе, ошибка).
+    Если текст похож на ошибку — он уйдёт в красный блок.
+    """
+    if text.startswith(("Ошибка", "ВКонтакте не настроено", "Не удалось")):
+        return "", text
+    return text, ""
+
+
+# =====================================================================
 # СТРАНИЦА САЙТА
 # =====================================================================
 @app.route("/", methods=["GET", "POST"])
 def index():
-    """Главная страница: форма со ссылкой и блок с готовым постом."""
-    post_text = ""
-    error = ""
-    link = ""
+    """
+    Главная страница: генерация поста, избранное, публикация в ВК.
+    Вся обработка — здесь, через поле action в форме.
+    """
+    post_text = ""       # текст поста, который сейчас показан на странице
+    link = ""            # ссылка на товар для этого поста
+    message = ""         # зелёное сообщение об успехе
+    error = ""           # красное сообщение об ошибке
 
     if request.method == "POST":
-        link = request.form.get("link", "").strip()
-        mood_key = request.form.get("mood", "friendly")
+        action = request.form.get("action", "generate")
 
-        # Проверка: ссылка обязательна (в форме помечена звёздочкой)
-        if not link:
-            error = "Пожалуйста, вставьте ссылку на товар."
-        elif not link.startswith(("http://", "https://")):
-            error = "Ссылка должна начинаться с http:// или https://"
+        # ---------- Сгенерировать новый пост ----------
+        if action == "generate":
+            link = request.form.get("link", "").strip()
+            mood_key = request.form.get("mood", "friendly")
+
+            if not link:
+                error = "Пожалуйста, вставьте ссылку на товар."
+            elif not link.startswith(("http://", "https://")):
+                error = "Ссылка должна начинаться с http:// или https://"
+            else:
+                settings = load_voice()
+                prompt = build_prompt(link, mood_key, settings)
+                post_text, error = ask_neural_network(prompt)
+
+        # ---------- Действия с уже готовым постом ----------
         else:
-            settings = load_voice()
-            prompt = build_prompt(link, mood_key, settings)
-            post_text, error = ask_neural_network(prompt)
+            # Текст поста приезжает из скрытого поля формы
+            post_text = request.form.get("post_text", "")
+            link = request.form.get("link", "")
+
+            if action == "favorite" and post_text:
+                _, message = add_to_favorites(post_text, link)
+
+            elif action == "publish" and post_text:
+                message, error = split_result(publish_to_vk(post_text))
+
+            elif action == "schedule" and post_text:
+                # Время из поля datetime-local (например 2026-10-21T15:30)
+                publish_at_raw = request.form.get("publish_at", "")
+                try:
+                    publish_at = datetime.fromisoformat(publish_at_raw)
+                    if publish_at <= datetime.now():
+                        error = "Выберите время в будущем."
+                    else:
+                        message, error = split_result(
+                            publish_to_vk(post_text, publish_at)
+                        )
+                except ValueError:
+                    error = "Укажите дату и время для отложенной записи."
+
+            elif action in ("use", "edit") and post_text:
+                # "use" — вставить пост из избранного в блок «Готовый пост»
+                # "edit" — сохранить текст после редактирования в textarea.
+                # В обоих случаях новый текст уже лежит в post_text —
+                # просто покажем его на странице.
+                pass
+
+            elif action == "delete_fav":
+                favorites, message = delete_from_favorites(
+                    request.form.get("fav_id", "")
+                )
 
     return render_template(
         "index.html",
         post=post_text,
-        error=error,
         link=link,
+        error=error,
+        message=message,
+        favorites=load_favorites(),
         # Список настроений для выпадающего списка на странице
         mood_options=[
             {"key": key, "label": value["label"]}
             for key, value in MOODS.items()
         ],
+        # Нужно ли показывать блок «Готовый пост»
+        show_actions=bool(post_text),
     )
 
 

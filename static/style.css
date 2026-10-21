@@ -174,3 +174,97 @@ textarea {
     color: #dc2626;
     font-weight: 600;
 }
+
+/* Сообщение об успехе (зелёное) */
+.success-message {
+    margin-bottom: 16px;
+    padding: 12px;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 10px;
+    color: #16a34a;
+    font-weight: 600;
+}
+
+/* Кнопка «Удалить» (красная) */
+.btn-danger {
+    padding: 12px 22px;
+    border: 2px solid #e11d48;
+    border-radius: 10px;
+    background: #ffffff;
+    color: #e11d48;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+
+.btn-danger:hover {
+    background: #e11d48;
+    color: #ffffff;
+}
+
+/* Ряд кнопок под готовым постом */
+.buttons-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+/* Строка «Отложить пост на: дата время [Отложить]» */
+.schedule-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.schedule-row label {
+    margin: 0;
+    font-weight: 600;
+}
+
+.schedule-row input {
+    width: auto;
+}
+
+/* Один пост в списке избранного */
+.favorite-item {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+    background: #f9fafb;
+}
+
+.favorite-text {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    background: #ffffff;
+    border-left: 4px solid #0077ff;
+    border-radius: 8px;
+    padding: 12px;
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.favorite-meta {
+    margin-top: 8px;
+    color: #9ca3af;
+    font-size: 13px;
+}
+
+/* Убираем большие отступы у форм внутри карточек */
+.actions-form {
+    margin: 0;
+}
+
+.actions-form label {
+    margin-top: 0;
+}
